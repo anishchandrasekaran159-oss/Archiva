@@ -2,7 +2,6 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { UploadCloud, CheckCircle } from 'lucide-react'
-import Topbar from '../components/Topbar.jsx'
 import { uploadFile } from '../api/archiva.js'
 
 const SUBJECTS = ['Physics', 'Mathematics', 'Chemistry', 'Biology', 'History', 'English']
@@ -17,10 +16,9 @@ export default function Upload() {
   const [subject, setSubject]     = useState(SUBJECTS[0])
   const [type, setType]           = useState(TYPES[0])
   const [progress, setProgress]   = useState(0)
-  const [status, setStatus]       = useState('idle') // idle | uploading | success | error
+  const [status, setStatus]       = useState('idle')
   const [errorMsg, setErrorMsg]   = useState('')
 
-  // ── Drop zone handlers ─────────────────────────────────────────────────────
   function onDrop(e) {
     e.preventDefault()
     setDragging(false)
@@ -30,10 +28,9 @@ export default function Upload() {
 
   function pickFile(f) {
     setFile(f)
-    if (!title) setTitle(f.name.replace(/\.[^.]+$/, '')) // auto-fill title from filename
+    if (!title) setTitle(f.name.replace(/\.[^.]+$/, ''))
   }
 
-  // ── Submit ─────────────────────────────────────────────────────────────────
   async function handleSubmit() {
     if (!file) return
     setStatus('uploading')
@@ -47,37 +44,31 @@ export default function Upload() {
     }
   }
 
-  // ── Success state ──────────────────────────────────────────────────────────
   if (status === 'success') {
     return (
-      <div className="flex flex-col flex-1 min-h-0">
-        <Topbar title="Upload" />
-        <main className="flex-1 flex flex-col items-center justify-center gap-4 p-6">
-          <div className="w-14 h-14 rounded-full bg-warm-tag flex items-center justify-center">
-            <CheckCircle size={28} className="text-warm-tag-text" strokeWidth={2} />
-          </div>
-          <p className="text-base font-medium text-ink-primary">File uploaded and indexed</p>
-          <p className="text-sm font-medium text-ink-secondary text-center max-w-xs">
-            Archiva embedded your resource. It's now searchable semantically across your library.
-          </p>
-          <div className="flex gap-2.5 mt-2">
-            <button onClick={() => navigate('/')} className="btn-primary">Go to Library</button>
-            <button onClick={() => { setFile(null); setTitle(''); setProgress(0); setStatus('idle') }}
-                    className="btn-ghost">
-              Upload another
-            </button>
-          </div>
-        </main>
+      <div className="flex-1 h-full overflow-y-auto flex items-center justify-center p-8">
+        <div className="flex flex-col items-center gap-4 text-center max-w-sm">
+        <div className="w-14 h-14 rounded-full bg-warm-tag flex items-center justify-center">
+          <CheckCircle size={28} className="text-warm-tag-text" strokeWidth={2} />
+        </div>
+        <p className="text-base font-medium text-ink-primary">File uploaded and indexed</p>
+        <p className="text-sm font-medium text-ink-secondary text-center max-w-xs">
+          Archiva embedded your resource. It's now searchable semantically across your library.
+        </p>
+        <div className="flex gap-2.5 mt-2">
+          <button onClick={() => navigate('/')} className="btn-primary">Go to Library</button>
+          <button onClick={() => { setFile(null); setTitle(''); setProgress(0); setStatus('idle') }}
+                  className="btn-ghost">Upload another</button>
+        </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <Topbar title="Upload" />
-
-      <main className="flex-1 overflow-y-auto p-6 flex flex-col items-center">
-        <div className="w-full max-w-lg"></div>
+    <div className="flex-1 h-full overflow-y-auto flex items-center justify-center p-8">
+      <div className="w-full max-w-xl">
+        <p className="text-[15px] font-medium text-ink-secondary font-serif mb-6 text-center">Upload a resource</p>
 
         {/* Drop zone */}
         <div
@@ -85,7 +76,7 @@ export default function Upload() {
           onDragLeave={() => setDragging(false)}
           onDrop={onDrop}
           onClick={() => inputRef.current?.click()}
-          className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer
+          className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer
                       transition-colors mb-5
                       ${dragging || file
                         ? 'border-warm-accent bg-warm-pale'
@@ -104,9 +95,7 @@ export default function Upload() {
           ) : (
             <>
               <p className="text-sm font-medium text-ink-primary">Drop files here or click to browse</p>
-              <p className="text-xs font-medium text-ink-secondary mt-1">
-                PDF, DOCX, PPTX, PNG, JPG — up to 50 MB
-              </p>
+              <p className="text-xs font-medium text-ink-secondary mt-1">PDF, DOCX, PPTX, PNG, JPG — up to 50 MB</p>
             </>
           )}
           <input ref={inputRef} type="file" className="hidden"
@@ -114,17 +103,11 @@ export default function Upload() {
                  onChange={e => e.target.files[0] && pickFile(e.target.files[0])} />
         </div>
 
-        {/* Form fields */}
+        {/* Form */}
         <div className="mb-4">
-          <label className="block text-[13px] font-medium text-ink-primary mb-1.5">
-            Resource title
-          </label>
-          <input
-            className="field"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder="e.g. Haloalkanes and Haloarenes — Chapter Notes"
-          />
+          <label className="block text-[13px] font-medium text-ink-primary mb-1.5">Resource title</label>
+          <input className="field" value={title} onChange={e => setTitle(e.target.value)}
+                 placeholder="e.g. Haloalkanes — Chapter Notes" />
         </div>
 
         <div className="grid grid-cols-2 gap-3 mb-5">
@@ -142,14 +125,11 @@ export default function Upload() {
           </div>
         </div>
 
-        {/* Progress bar — visible only while uploading */}
         {status === 'uploading' && (
           <div className="mb-4">
             <div className="h-1.5 bg-warm-stat rounded-full overflow-hidden">
-              <div
-                className="h-full bg-warm-accent rounded-full transition-all duration-200"
-                style={{ width: `${progress}%` }}
-              />
+              <div className="h-full bg-warm-accent rounded-full transition-all duration-200"
+                   style={{ width: `${progress}%` }} />
             </div>
             <p className="text-xs font-medium text-ink-muted mt-1">{progress}% uploaded…</p>
           </div>
@@ -168,9 +148,9 @@ export default function Upload() {
         </button>
 
         <p className="text-xs font-medium text-ink-secondary text-center mt-3">
-          Archiva will keep your file safe. Grab it whenever you need it
+          Archiva will keep your file safe. Grab it whenever you need it.
         </p>
-      </main>
+      </div>
     </div>
   )
 }
