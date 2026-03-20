@@ -75,14 +75,20 @@ async def search(q: str, limit: int = 5):
 async def list_files(subject: str = None):
     """List all uploaded files, optionally filtered by subject."""
     query = supabase.table("files").select(
-        "id, filename, note, subject, file_size_bytes, created_at"
+        "id, filename, note, subject, file_size_bytes, storage_path, created_at"
     ).order("created_at", desc=True)
 
     if subject:
         query = query.eq("subject", subject)
 
     response = query.execute()
-    return {"files": response.data}
+    files = response.data
+
+    # Generate signed download URL for each file — same as search endpoint
+    for file in files:
+        file["download_url"] = get_download_url(file["storage_path"])
+
+    return {"files": files}
 
 
 @router.get("/files/{file_id}")
