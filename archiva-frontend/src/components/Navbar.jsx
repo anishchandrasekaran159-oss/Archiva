@@ -1,15 +1,65 @@
 // components/Navbar.jsx
 import { NavLink, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { LogOut } from 'lucide-react'
+import { supabase } from '../lib/supabase.js'
 
 export default function Navbar() {
   const navigate = useNavigate()
-  const [query, setQuery] = useState('')
+  const [query, setQuery]       = useState('')
+  const [user, setUser]         = useState(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null)
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    navigate('/login')
+  }
 
   function handleSearch(e) {
     e.preventDefault()
     if (query.trim()) navigate(`/search?q=${encodeURIComponent(query.trim())}`)
   }
+
+  // Get initials from full_name, skipping honorifics like Mrs./Mr./Dr.
+  // "Mrs. Sridevi Rose" → "SR", "Anish Kumar" → "AK"
+  // Falls back to email if no name is set
+  function getInitials(user) {
+    const name = user?.user_metadata?.full_name
+    if (name) {
+      const words = name.trim().split(/\s+/).filter(w => !/^(mr|mrs|ms|dr|prof)\.?$/i.test(w))
+      if (words.length >= 2) return (words[0][0] + words[words.length - 1][0]).toUpperCase()
+      if (words.length === 1) return words[0].slice(0, 2).toUpperCase()
+    }
+    const email = user?.email ?? ''
+    const parts = email.split('@')[0].split(/[._\-]/)
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+    return email.slice(0, 2).toUpperCase()
+  }
+
+  const initials    = user ? getInitials(user) : '?'
+  const displayName = user?.user_metadata?.full_name || user?.email || ''
+  const email       = user?.email ?? ''
 
   const navClass = ({ isActive }) =>
     `px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors duration-150 ` +
@@ -20,7 +70,7 @@ export default function Navbar() {
   return (
     <nav className="h-14 bg-white border-b-[1.5px] border-[#E0C9A8] flex items-center px-6 flex-shrink-0 sticky top-0 z-20">
 
-      {/* Left — Logo + Nav links (fixed width so center is truly centered) */}
+      {/* Left — Logo + Nav */}
       <div className="flex items-center gap-4 w-[280px] flex-shrink-0">
         <div className="flex items-center gap-2.5 flex-shrink-0">
           <div className="w-[30px] h-[30px] bg-warm-accent rounded-lg flex items-center justify-center flex-shrink-0">
@@ -41,7 +91,7 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Center — Search bar, truly centered */}
+      {/* Center — Search */}
       <div className="flex-1 flex justify-center px-4">
         <form onSubmit={handleSearch} className="relative w-full max-w-md">
           <svg
@@ -62,14 +112,42 @@ export default function Navbar() {
         </form>
       </div>
 
-      {/* Right — Avatar (fixed width to balance left side) */}
-      <div className="w-[280px] flex-shrink-0 flex justify-end">
-        <div
-          className="w-[30px] h-[30px] rounded-full bg-warm-accent flex items-center justify-center
-                     text-white text-[11px] font-medium flex-shrink-0 cursor-pointer"
-          title="Mrs. Rose"
-        >
-          SR
+      {/* Right — Avatar + dropdown */}
+      <div className="w-[280px] flex-shrink-0 flex justify-end" ref={menuRef}>
+        <div className="relative">
+
+          <button
+            onClick={() => setMenuOpen(v => !v)}
+            className="w-[32px] h-[32px] rounded-full bg-warm-accent flex items-center justify-center
+                       text-white text-[11px] font-semibold cursor-pointer hover:opacity-90 transition-opacity"
+            title={displayName}
+          >
+            {initials}
+          </button>
+
+          {menuOpen && (
+            <div className="absolute right-0 top-[calc(100%+8px)] w-56 bg-white border-[1.5px]
+                            border-warm-border rounded-xl shadow-lg overflow-hidden z-50">
+
+              {/* Show name + email, or just email if no name */}
+              <div className="px-4 py-3 border-b-[1.5px] border-warm-border">
+                {displayName !== email && (
+                  <p className="text-[13px] font-medium text-ink-primary truncate mb-0.5">{displayName}</p>
+                )}
+                <p className="text-[11px] text-ink-muted truncate">{email}</p>
+              </div>
+
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium
+                           text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <LogOut size={14} />
+                Log out
+              </button>
+
+            </div>
+          )}
         </div>
       </div>
 

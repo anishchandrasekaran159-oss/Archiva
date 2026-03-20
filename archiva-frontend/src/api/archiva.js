@@ -1,59 +1,55 @@
 // api/archiva.js
-// All backend calls live here. Update BASE_URL to match your FastAPI server.
-// In dev, Vite proxies /api → http://localhost:8000 (see vite.config.js).
+import { getAccessToken } from '../lib/supabase.js'
 
 const BASE_URL = '/api'
 
-// ─── Helper ──────────────────────────────────────────────────────────────────
 async function request(path, options = {}) {
-  const res = await fetch(`${BASE_URL}${path}`, options)
+  const token = await getAccessToken()
+  if (!token) throw new Error('Not authenticated')
+
+  const res = await fetch(`${BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(err.detail || 'Request failed')
   }
-  // 204 No Content has no body
   if (res.status === 204) return null
   return res.json()
 }
 
-// ─── Files ───────────────────────────────────────────────────────────────────
-
-/** GET /files — list all uploaded files, optionally filtered by subject */
 export async function getFiles(subject = null) {
   const params = subject ? `?subject=${encodeURIComponent(subject)}` : ''
   const data = await request(`/files${params}`)
-  // Handle both a raw array and a wrapped { files: [...] } response
   return Array.isArray(data) ? data : (data.files ?? data.results ?? [])
 }
 
-/** GET /files/:id — get a single file's metadata */
 export async function getFile(id) {
   return request(`/files/${id}`)
 }
 
-/** DELETE /files/:id — delete a file */
 export async function deleteFile(id) {
   return request(`/files/${id}`, { method: 'DELETE' })
 }
 
-// ─── Upload ──────────────────────────────────────────────────────────────────
-
-/**
- * POST /upload — upload and embed a file
- * @param {File}   file     - the File object from an input or drop event
- * @param {object} meta     - { title, subject, type } extra metadata
- * @param {function} onProgress - optional callback (0–100) for upload progress
- */
 export async function uploadFile(file, meta = {}, onProgress) {
+  const token = await getAccessToken()
+  if (!token) throw new Error('Not authenticated')
+
   const formData = new FormData()
   formData.append('file', file)
   if (meta.title)   formData.append('note',    meta.title)
   if (meta.subject) formData.append('subject', meta.subject)
 
-  // Use XMLHttpRequest so we can track upload progress
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('POST', `${BASE_URL}/upload`)
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`)
 
     if (onProgress) {
       xhr.upload.addEventListener('progress', (e) => {
@@ -75,13 +71,6 @@ export async function uploadFile(file, meta = {}, onProgress) {
   })
 }
 
-// ─── Search ──────────────────────────────────────────────────────────────────
-
-/**
- * GET /search?q=... — semantic search
- * @param {string} query - natural language query
- * @param {number} limit - max results (default 10)
- */
 export async function searchFiles(query, limit = 10) {
   const params = new URLSearchParams({ q: query, limit })
   return request(`/search?${params}`)

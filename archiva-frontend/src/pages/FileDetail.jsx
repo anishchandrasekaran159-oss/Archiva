@@ -1,7 +1,7 @@
 // pages/FileDetail.jsx
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ExternalLink, Trash2 } from 'lucide-react'
+import { ArrowLeft, Download, Trash2, FileText } from 'lucide-react'
 import { getFile, deleteFile } from '../api/archiva.js'
 
 const EXT_COLORS = {
@@ -19,6 +19,14 @@ function getExt(filename = '') {
   return filename.split('.').pop().toLowerCase()
 }
 
+function isPDF(filename = '') {
+  return getExt(filename) === 'pdf'
+}
+
+function isImage(filename = '') {
+  return ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(getExt(filename))
+}
+
 function FileTypeIcon({ filename, size = 44 }) {
   const ext = getExt(filename)
   const { bg, stroke } = EXT_COLORS[ext] || { bg: '#E8E0D4', stroke: '#8A6040' }
@@ -33,27 +41,63 @@ function FileTypeIcon({ filename, size = 44 }) {
   )
 }
 
-function RecCard({ file, onClick }) {
-  const date = file.created_at ? new Date(file.created_at).toLocaleDateString() : null
-  return (
-    <div onClick={onClick} className="card cursor-pointer flex gap-3 items-start hover:border-warm-accent transition-colors">
-      <FileTypeIcon filename={file.filename} size={36} />
-      <div className="flex-1 min-w-0">
-        <p className="text-[13px] font-medium text-ink-primary leading-snug mb-0.5 line-clamp-1">{file.filename}</p>
-        {file.note && (
-          <p className="text-[11px] text-ink-secondary line-clamp-2 leading-snug mb-1">{file.note}</p>
-        )}
-        <div className="flex items-center gap-2 flex-wrap">
-          {file.subject && (
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-warm-tag text-warm-tag-text">{file.subject}</span>
-          )}
-          {date && <span className="text-[10px] font-medium text-ink-muted">{date}</span>}
+// ── Preview: Google Docs viewer to avoid Content-Disposition: attachment ──────
+function FilePreview({ filename, url }) {
+  if (!url) return null
+
+  if (isPDF(filename)) {
+    const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`
+    return (
+      <div className="flex flex-col h-full">
+        <p className="text-[11px] font-medium text-ink-muted uppercase tracking-[0.6px] mb-2">Preview</p>
+        <div
+          className="flex-1 rounded-xl overflow-hidden border-[1.5px] border-warm-border bg-gray-50"
+          style={{ minHeight: '600px' }}
+        >
+          <iframe
+            src={viewerUrl}
+            title={filename}
+            className="w-full h-full"
+            style={{ border: 'none', minHeight: '600px' }}
+          />
         </div>
+      </div>
+    )
+  }
+
+  if (isImage(filename)) {
+    return (
+      <div className="flex flex-col h-full">
+        <p className="text-[11px] font-medium text-ink-muted uppercase tracking-[0.6px] mb-2">Preview</p>
+        <div className="flex-1 rounded-xl overflow-hidden border-[1.5px] border-warm-border bg-gray-50
+                        flex items-center justify-center p-4">
+          <img
+            src={url}
+            alt={filename}
+            className="max-w-full max-h-[580px] object-contain rounded-lg"
+          />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <p className="text-[11px] font-medium text-ink-muted uppercase tracking-[0.6px] mb-2">Preview</p>
+      <div
+        className="flex-1 rounded-xl border-[1.5px] border-dashed border-warm-border bg-gray-50
+                   flex flex-col items-center justify-center gap-2"
+        style={{ minHeight: '300px' }}
+      >
+        <FileText size={28} className="text-ink-muted opacity-40" />
+        <p className="text-[13px] font-medium text-ink-muted">Preview not available</p>
+        <p className="text-[11px] text-ink-muted opacity-70">Open the file to view its contents</p>
       </div>
     </div>
   )
 }
 
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function FileDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -87,9 +131,9 @@ export default function FileDetail() {
     </div>
   )
 
-  const file  = data?.file
-  const recs  = data?.recommendations ?? []
-  const date  = file?.created_at
+  const file   = data?.file
+  const recs   = data?.recommendations ?? []
+  const date   = file?.created_at
     ? new Date(file.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
     : null
   const sizeMB = file?.file_size_bytes
@@ -98,7 +142,7 @@ export default function FileDetail() {
 
   return (
     <div className="flex-1 overflow-y-auto h-full">
-      <div className="p-8 max-w-3xl">
+      <div className="p-8">
 
         <button
           onClick={() => navigate(-1)}
@@ -109,80 +153,106 @@ export default function FileDetail() {
           Back
         </button>
 
-        <div className="bg-white border-[1.5px] border-warm-border rounded-xl p-6 mb-5">
-          <div className="flex items-start gap-4 mb-5">
-            <FileTypeIcon filename={file.filename} size={52} />
-            <div className="flex-1 min-w-0">
-              <h1 className="text-[17px] font-medium text-ink-primary leading-tight mb-1 font-serif">
-                {file.filename}
-              </h1>
-              {file.note && (
-                <p className="text-[13px] text-ink-secondary leading-relaxed">{file.note}</p>
+        <div className="flex gap-6 items-start">
+
+          {/* ── LEFT — info + recommendations ── */}
+          <div className="w-80 flex-shrink-0 flex flex-col gap-4">
+
+            <div className="bg-white border-[1.5px] border-warm-border rounded-xl p-5">
+
+              <div className="flex items-start gap-3 mb-4">
+                <FileTypeIcon filename={file.filename} size={48} />
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-[15px] font-medium text-ink-primary leading-tight mb-1 font-serif">
+                    {file.filename}
+                  </h1>
+                  {file.note && (
+                    <p className="text-[12px] text-ink-secondary leading-relaxed">{file.note}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Download button — saves file directly */}
+              {file.download_url && (
+                <a
+                  href={file.download_url}
+                  download={file.filename}
+                  className="flex items-center justify-center gap-2 w-full py-3 rounded-lg
+                             bg-warm-accent text-white text-[14px] font-semibold
+                             hover:opacity-90 active:opacity-80 transition-opacity mb-4"
+                >
+                  <Download size={16} />
+                  Download
+                </a>
               )}
+
+              <div className="border-t-[1.5px] border-warm-border mb-3" />
+
+              <div className="flex flex-col gap-3">
+                {file.subject && (
+                  <div>
+                    <p className="text-[10px] font-medium text-ink-muted uppercase tracking-[0.6px] mb-1">Subject</p>
+                    <span className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-warm-tag text-warm-tag-text inline-block">
+                      {file.subject}
+                    </span>
+                  </div>
+                )}
+                {date && (
+                  <div>
+                    <p className="text-[10px] font-medium text-ink-muted uppercase tracking-[0.6px] mb-1">Uploaded</p>
+                    <p className="text-[12px] font-medium text-ink-primary">{date}</p>
+                  </div>
+                )}
+                {sizeMB && (
+                  <div>
+                    <p className="text-[10px] font-medium text-ink-muted uppercase tracking-[0.6px] mb-1">File size</p>
+                    <p className="text-[12px] font-medium text-ink-primary">{sizeMB}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t-[1.5px] border-warm-border mt-4 pt-3 flex justify-end">
+                <button
+                  onClick={handleDelete}
+                  className="flex items-center gap-1.5 text-[11px] font-medium text-ink-muted hover:text-red-600 transition-colors"
+                >
+                  <Trash2 size={12} />
+                  Delete file
+                </button>
+              </div>
             </div>
-            {file.download_url && (
-              <a href={file.download_url} target="_blank" rel="noreferrer" className="btn-primary flex-shrink-0">
-                <ExternalLink size={14} />
-                Open file
-              </a>
-            )}
-          </div>
 
-          <div className="border-t-[1.5px] border-warm-border mb-4" />
-
-          <div className="grid grid-cols-3 gap-4">
-            {file.subject && (
-              <div>
-                <p className="text-[10px] font-medium text-ink-muted uppercase tracking-[0.6px] mb-1">Subject</p>
-                <span className="text-[12px] font-medium px-2.5 py-1 rounded-full bg-warm-tag text-warm-tag-text inline-block">
-                  {file.subject}
-                </span>
+            {recs.length > 0 && (
+              <div className="bg-white border-[1.5px] border-warm-border rounded-xl p-5">
+                <h2 className="text-[12px] font-medium text-ink-primary mb-3">You might also need</h2>
+                <div className="flex flex-col gap-2">
+                  {recs.map(rec => (
+                    <div
+                      key={rec.id}
+                      onClick={() => navigate(`/files/${rec.id}`)}
+                      className="flex gap-2.5 items-start cursor-pointer p-2 rounded-lg hover:bg-warm-tag transition-colors"
+                    >
+                      <FileTypeIcon filename={rec.filename} size={30} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-medium text-ink-primary leading-snug line-clamp-1">{rec.filename}</p>
+                        {rec.note && (
+                          <p className="text-[10px] text-ink-secondary line-clamp-1 mt-0.5">{rec.note}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
-            {date && (
-              <div>
-                <p className="text-[10px] font-medium text-ink-muted uppercase tracking-[0.6px] mb-1">Uploaded</p>
-                <p className="text-[13px] font-medium text-ink-primary">{date}</p>
-              </div>
-            )}
-            {sizeMB && (
-              <div>
-                <p className="text-[10px] font-medium text-ink-muted uppercase tracking-[0.6px] mb-1">File size</p>
-                <p className="text-[13px] font-medium text-ink-primary">{sizeMB}</p>
-              </div>
-            )}
+
           </div>
 
-          <div className="border-t-[1.5px] border-warm-border mt-5 pt-4 flex justify-end">
-            <button
-              onClick={handleDelete}
-              className="flex items-center gap-1.5 text-[12px] font-medium text-ink-muted hover:text-red-600 transition-colors"
-            >
-              <Trash2 size={13} />
-              Delete file
-            </button>
+          {/* ── RIGHT — preview ── */}
+          <div className="flex-1 min-w-0">
+            <FilePreview filename={file.filename} url={file.download_url} />
           </div>
+
         </div>
-
-        {recs.length > 0 && (
-          <>
-            <div className="flex items-center gap-2 mb-3">
-              <h2 className="text-[13px] font-medium text-ink-primary">You might also need</h2>
-              <span className="text-[11px] font-medium text-ink-muted">— based on similarity</span>
-            </div>
-            <div className="flex flex-col gap-2.5">
-              {recs.map(rec => (
-                <RecCard key={rec.id} file={rec} onClick={() => navigate(`/files/${rec.id}`)} />
-              ))}
-            </div>
-          </>
-        )}
-
-        {recs.length === 0 && (
-          <p className="text-[12px] font-medium text-ink-muted text-center mt-4">
-            No similar files found yet — upload more resources to see recommendations.
-          </p>
-        )}
       </div>
     </div>
   )
